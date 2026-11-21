@@ -6,7 +6,7 @@ Silent Ledger is a complete, original top-down stealth game that plays offline i
 
 - **Move** — Use the **Arrow keys** or **WASD** to move one tile per press.
 - **Vision cones** — Guards sweep translucent yellow cones ahead of them. If a cone touches your tile and no wall or crate blocks the line of sight, you are spotted and sent back to the start.
-- **Crates** — Wooden crates block both movement and sightcars, so hiding behind one keeps you out of every cone.
+- **Crates** — Wooden crates block both movement and sight, so hiding behind one keeps you out of every cone.
 - **Exit** — Step onto the bright green tile to escape. Finish unseen to win.
 - **Restart** — Use the Restart button (or Space) to reset the level and your Moves/Seen counters.
 

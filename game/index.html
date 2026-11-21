@@ -45,8 +45,8 @@
   var TILE=48, COLS=20, ROWS=10;
   var MAP=[
     "####################",
-    "#......#.......#...#",
-    "#.CC...#...C...#.#E#",
+    "#...C..#.......#...#",
+    "#..C...#...C...#.#E#",
     "#......#.......#...#",
     "#..##.....##.......#",
     "#......C......##...#",
@@ -309,7 +309,7 @@ if(player.x===18&&player.y===2){win();return;}
   var shot=params.get("shot");
   initGuards();
   if(shot==="play"){
-    playSeq(["ArrowRight","ArrowRight","ArrowUp","ArrowUp","ArrowRight","ArrowRight","ArrowDown"]);
+    playSeq(["ArrowRight","ArrowLeft","ArrowRight","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowRight"]);
   } else if(shot==="spotted"){
     playSeq(["ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowRight","ArrowRight","ArrowRight"]);
   } else if(shot==="end"){
