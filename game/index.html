@@ -29,7 +29,7 @@
 <body>
 <div id="stage">
   <div id="hud">
-    <div id="status">Level 1 — Reach the green exit. Stay out of the yellow vision cones. Hide behind crates.</div>
+    <div id="status">Level 1 — Reach the green exit. 3 guards, cones reach 3 tiles. Hide behind crates.</div>
     <div id="right">
       <div id="counters">Moves 0 &middot; Seen 0</div>
       <button id="restart">Restart</button>
@@ -60,6 +60,7 @@
   var START={x:1,y:8};
   var player={x:START.x,y:START.y};
   var moves=0, seen=0, won=false, noSpot=false;
+  var CONE_RANGE=3, frame=0;
   var guardDefs=[
     {wp:[[5,1],[9,1],[9,3],[5,3]],start:[5,1]},
     {wp:[[14,4],[14,7],[17,7],[17,4]],start:[14,4]},
@@ -145,7 +146,7 @@ if(player.x===18&&player.y===2){win();return;}
       setStatus("Spotted! Back to the start.");
       player.x=START.x; player.y=START.y;
     } else {
-      setStatus("Level 1 — Reach the green exit. Stay out of the yellow vision cones. Hide behind crates.");
+      setStatus(defaultStatus());
     }
     refresh();
   }
@@ -173,18 +174,22 @@ if(player.x===18&&player.y===2){win();return;}
     refresh();
   }
   function setStatus(s){document.getElementById("status").textContent=s;}
+  function defaultStatus(){
+    return "Level 1 — Reach the green exit. "+guards.length+" guards, cones reach "+CONE_RANGE+" tiles. Hide behind crates.";
+  }
   function updateCounters(){document.getElementById("counters").textContent="Moves "+moves+" \u00b7 Seen "+seen;}
   function restart(){
-    player.x=START.x; player.y=START.y; moves=0; seen=0; won=false;
+    player.x=START.x; player.y=START.y; moves=0; seen=0; won=false; frame=0;
     initGuards();
     document.getElementById("winband").style.display="none";
-    setStatus("Level 1 — Reach the green exit. Stay out of the yellow vision cones. Hide behind crates.");
+    setStatus(defaultStatus());
     refresh();
   }
   var cv=document.getElementById("cv");
   var ctx=cv.getContext("2d");
 
   function draw(){
+    frame++;
     ctx.clearRect(0,0,cv.width,cv.height);
     // floor + walls + crates
     for(var r=0;r<ROWS;r++){
@@ -204,7 +209,9 @@ if(player.x===18&&player.y===2){win();return;}
         }
         if(ch==='E'){
           var s=14;
-          ctx.fillStyle="#1fbf6b"; ctx.fillRect(x+(TILE-s)/2,y+(TILE-s)/2,s,s);
+          var bright=(frame&1)?"#33d97f":"#1fbf6b";
+          ctx.fillStyle=bright; ctx.fillRect(x+(TILE-s)/2,y+(TILE-s)/2,s,s);
+          ctx.strokeStyle="#16a05a"; ctx.lineWidth=2; ctx.strokeRect(x+(TILE-s)/2,y+(TILE-s)/2,s,s);
         }
       }
     }
@@ -236,6 +243,24 @@ if(player.x===18&&player.y===2){win();return;}
         if(inCone(g,c,r)){
           ctx.fillStyle="rgba(255,210,60,0.35)";
           ctx.fillRect(c*TILE,r*TILE,TILE,TILE);
+        }
+      }
+    }
+    // brighter rim: cone tiles whose 8-neighbourhood touches a non-cone tile
+    for(var r2=0;r2<ROWS;r2++){
+      for(var c2=0;c2<COLS;c2++){
+        if(!inCone(g,c2,r2))continue;
+        var rim=false;
+        for(var dy=-1;dy<=1&&!rim;dy++){
+          for(var dx=-1;dx<=1;dx++){
+            var ncx=c2+dx, nry=r2+dy;
+            if(ncx===c2&&nry===r2)continue;
+            if(!inCone(g,ncx,nry)){rim=true;break;}
+          }
+        }
+        if(rim){
+          ctx.fillStyle="rgba(255,225,110,0.55)";
+          ctx.fillRect(c2*TILE,r2*TILE,TILE,TILE);
         }
       }
     }
