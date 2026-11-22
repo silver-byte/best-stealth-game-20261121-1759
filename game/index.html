@@ -21,15 +21,15 @@
   #hint{position:absolute;left:0;right:0;bottom:0;height:24px;background:rgba(11,16,32,.78);
         display:flex;align-items:center;padding:0 12px;box-sizing:border-box;
         color:#93a2bb;font-size:12px;z-index:5;}
-  #winband{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(11,16,32,.55);
-           display:none;align-items:center;justify-content:center;z-index:10;}
-  #winband span{font-size:42px;font-weight:bold;color:#1fbf6b;letter-spacing:2px;}
+  #band{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(11,16,32,.55);
+        display:none;align-items:center;justify-content:center;z-index:10;cursor:pointer;}
+  #band span{font-size:42px;font-weight:bold;color:#1fbf6b;letter-spacing:2px;text-align:center;line-height:1.25;}
 </style>
 </head>
 <body>
 <div id="stage">
   <div id="hud">
-    <div id="status">Level 1 — Reach the green exit. 3 guards, cones reach 3 tiles. Hide behind crates.</div>
+    <div id="status">Level 1 of 2 — Reach the green exit. 3 guards, cones reach 3 tiles. Hide behind crates.</div>
     <div id="right">
       <div id="counters">Moves 0 &middot; Seen 0</div>
       <button id="restart">Restart</button>
@@ -37,48 +37,81 @@
   </div>
   <canvas id="cv" width="960" height="480"></canvas>
   <div id="hint">Arrow keys / WASD to move tile by tile. Guards patrol; if a guard's cone touches you and no crate blocks the view, you are spotted.</div>
-  <div id="winband"><span>UNSEEN. YOU ESCAPED.</span></div>
+  <div id="band"><span id="bandtext"></span></div>
 </div>
 <script>
 "use strict";
 (function(){
   var TILE=48, COLS=20, ROWS=10;
-  var MAP=[
-    "####################",
-    "#...C..#.......#...#",
-    "#..C...#...C...#.#E#",
-    "#......#.......#...#",
-    "#..##.....##.......#",
-    "#......C......##...#",
-    "#..#.......#.......#",
-    "#..#...C...#...##..#",
-    "#P.....#.......#...#",
-    "####################"
+  var LEVELS=[
+    {
+      map:[
+        "####################",
+        "#...C..#.......#...#",
+        "#..C...#...C...#.#E#",
+        "#......#.......#...#",
+        "#..##.....##.......#",
+        "#......C......##...#",
+        "#..#.......#.......#",
+        "#..#...C...#...##..#",
+        "#P.....#.......#...#",
+        "####################"
+      ],
+      start:{x:1,y:8}, exit:{x:18,y:2}, coneRange:3,
+      guards:[
+        {wp:[[5,1],[9,1],[9,3],[5,3]],start:[5,1]},
+        {wp:[[14,4],[14,7],[17,7],[17,4]],start:[14,4]},
+        {wp:[[11,8],[15,8],[15,6],[11,6]],start:[11,8]}
+      ]
+    },
+    {
+      map:[
+        "####################",
+        "#......######......#",
+        "#.CC...######..CC..#",
+        "#......######......#",
+        "#..##..........#..C#",
+        "#..C....#..#.......#",
+        "#......######......#",
+        "#.CC...######..CC..#",
+        "#P.....######...E..#",
+        "####################"
+      ],
+      start:{x:1,y:8}, exit:{x:18,y:8}, coneRange:3,
+      guards:[
+        {wp:[[1,1],[6,1],[6,3],[1,3]],start:[1,1]},
+        {wp:[[13,1],[18,1],[18,3],[13,3]],start:[13,1]},
+        {wp:[[13,6],[18,6],[18,8],[13,8]],start:[13,6]},
+        {wp:[[1,6],[6,6],[6,8],[1,8]],start:[6,6]}
+      ]
+    }
   ];
-  var grid=[];
-  for(var r=0;r<ROWS;r++){grid.push([]);for(var c=0;c<COLS;c++){grid[r].push(MAP[r][c]);}}
-  var START={x:1,y:8};
-  var player={x:START.x,y:START.y};
-  var moves=0, seen=0, won=false, noSpot=false;
-  var CONE_RANGE=3, frame=0;
-  var guardDefs=[
-    {wp:[[5,1],[9,1],[9,3],[5,3]],start:[5,1]},
-    {wp:[[14,4],[14,7],[17,7],[17,4]],start:[14,4]},
-    {wp:[[11,8],[15,8],[15,6],[11,6]],start:[11,8]}
-  ];
+  var grid=[], LEVEL=0, CONE_RANGE=3, EXIT={x:18,y:2};
+  var START={x:1,y:8}, player={x:1,y:8};
+  var moves=0, seen=0, won=false, noSpot=false, levelClear=false, shotMode=false;
+  var spottedAt=null, frame=0;
   var guards=[];
 
+  function loadLevel(i){
+    LEVEL=i;
+    var L=LEVELS[i];
+    grid=[];
+    for(var r=0;r<ROWS;r++){grid.push([]);for(var c=0;c<COLS;c++){grid[r].push(L.map[r][c]);}}
+    START=L.start; EXIT=L.exit; CONE_RANGE=L.coneRange;
+    player={x:START.x,y:START.y};
+    initGuards();
+  }
   function initGuards(){
     guards=[];
-    for(var i=0;i<guardDefs.length;i++){
-      var d=guardDefs[i];
+    var defs=LEVELS[LEVEL].guards;
+    for(var i=0;i<defs.length;i++){
+      var d=defs[i];
       var dir=[1,0];
       if(d.wp[0][0]===d.wp[1][0]){dir=[0,1];}
       guards.push({x:d.start[0],y:d.start[1],wp:d.wp,wpIdx:0,dir:dir});
     }
   }
   function guardFacing(g){
-    // direction of travel toward next waypoint
     var nxt=g.wp[(g.wpIdx+1)%g.wp.length];
     var dx=nxt[0]-g.x, dy=nxt[1]-g.y;
     if(dx>0)return[1,0];
@@ -93,7 +126,6 @@
     return ch==='#'||ch==='C';
   }
   function losBlocked(gx,gy,tx,ty){
-    // sample straight line between cell centers; any # or C on it blocks
     var x0=gx*TILE+TILE/2, y0=gy*TILE+TILE/2;
     var x1=tx*TILE+TILE/2, y1=ty*TILE+TILE/2;
     var dx=x1-x0, dy=y1-y0;
@@ -108,7 +140,7 @@
       var idx=cr*COLS+cc;
       if(idx!==lastIdx){
         lastIdx=idx;
-        if(cc===gx&&cr===gy)continue; // guard's own cell
+        if(cc===gx&&cr===gy)continue;
         var ch=grid[cr]?grid[cr][cc]:'#';
         if(ch==='#'||ch==='C')return true;
       }
@@ -118,7 +150,7 @@
   function inCone(g,tx,ty){
     var ox=tx-g.x, oy=ty-g.y;
     var d=Math.abs(ox)+Math.abs(oy);
-    if(d<1||d>3)return false;
+    if(d<1||d>CONE_RANGE)return false;
     var f=guardFacing(g);
     var dot=ox*f[0]+oy*f[1];
     if(dot<=0)return false;
@@ -134,18 +166,20 @@
     return false;
   }
   function movePlayer(dx,dy){
-    if(won)return;
+    if(won||levelClear)return;
     var nx=player.x+dx, ny=player.y+dy;
     if(solid(nx,ny))return;
     player.x=nx; player.y=ny;
     moves++;
     stepGuards();
-if(player.x===18&&player.y===2){win();return;}
+    if(player.x===EXIT.x&&player.y===EXIT.y){enterExit();return;}
     if(!noSpot&&playerSpotted()){
       seen++;
+      spottedAt={x:player.x,y:player.y};
       setStatus("Spotted! Back to the start.");
       player.x=START.x; player.y=START.y;
     } else {
+      spottedAt=null;
       setStatus(defaultStatus());
     }
     refresh();
@@ -167,21 +201,60 @@ if(player.x===18&&player.y===2){win();return;}
       g.dir=guardFacing(g);
     }
   }
-  function win(){
+  function enterExit(){
+    if(shotMode){
+      if(LEVEL===0){ loadLevel(1); setStatus(defaultStatus()); refresh(); return; }
+      won=true;
+      var grade=gradeRun();
+      var label=(grade==="GHOST"||grade==="UNSEEN")?"UNSEEN. YOU ESCAPED — GRADE: "+grade:"YOU ESCAPED — GRADE: "+grade;
+      showBand(label);
+      refresh();
+      return;
+    }
+    if(LEVEL===0){
+      levelClear=true;
+      setStatus("Level 1 clear. Press Space for Level 2.");
+      showBand("LEVEL 1 CLEAR — SPACE FOR LEVEL 2");
+      refresh();
+      return;
+    }
     won=true;
-    setStatus("Level complete — you were seen "+seen+" time(s) in "+moves+" moves.");
-    document.getElementById("winband").style.display="flex";
+    var grade=gradeRun();
+    var label=(grade==="GHOST"||grade==="UNSEEN")?"UNSEEN. YOU ESCAPED — GRADE: "+grade:"YOU ESCAPED — GRADE: "+grade;
+    showBand(label);
     refresh();
+  }
+  function gradeRun(){
+    if(seen===0&&moves<=60)return"GHOST";
+    if(seen===0)return"UNSEEN";
+    if(seen<=2)return"SHADOW";
+    return"DETECTED BUT OUT";
+  }
+  function advanceToLevel2(){
+    if(LEVEL===1)return;
+    levelClear=false;
+    loadLevel(1);
+    hideBand();
+    setStatus(defaultStatus());
+    refresh();
+  }
+  function showBand(t){
+    document.getElementById("bandtext").textContent=t;
+    document.getElementById("band").style.display="flex";
+  }
+  function hideBand(){
+    document.getElementById("band").style.display="none";
   }
   function setStatus(s){document.getElementById("status").textContent=s;}
   function defaultStatus(){
-    return "Level 1 — Reach the green exit. "+guards.length+" guards, cones reach "+CONE_RANGE+" tiles. Hide behind crates.";
+    return "Level "+(LEVEL+1)+" of 2 — Reach the green exit. "+guards.length+" guards, cones reach "+CONE_RANGE+" tiles. Hide behind crates.";
   }
   function updateCounters(){document.getElementById("counters").textContent="Moves "+moves+" \u00b7 Seen "+seen;}
   function restart(){
-    player.x=START.x; player.y=START.y; moves=0; seen=0; won=false; frame=0;
-    initGuards();
-    document.getElementById("winband").style.display="none";
+    levelClear=false; won=false; noSpot=false; shotMode=false; spottedAt=null; frame=0;
+    moves=0; seen=0;
+    loadLevel(0);
+    hideBand();
     setStatus(defaultStatus());
     refresh();
   }
@@ -191,7 +264,6 @@ if(player.x===18&&player.y===2){win();return;}
   function draw(){
     frame++;
     ctx.clearRect(0,0,cv.width,cv.height);
-    // floor + walls + crates
     for(var r=0;r<ROWS;r++){
       for(var c=0;c<COLS;c++){
         var x=c*TILE, y=r*TILE;
@@ -215,11 +287,7 @@ if(player.x===18&&player.y===2){win();return;}
         }
       }
     }
-    // vision cones
-    for(var i=0;i<guards.length;i++){
-      drawCone(guards[i]);
-    }
-    // guards
+    for(var i=0;i<guards.length;i++){ drawCone(guards[i]); }
     for(var j=0;j<guards.length;j++){
       var g=guards[j];
       var cx=g.x*TILE+TILE/2, cy=g.y*TILE+TILE/2;
@@ -230,11 +298,18 @@ if(player.x===18&&player.y===2){win();return;}
       ctx.fillStyle="#ffffff";
       ctx.fillRect(fx-5,fy-5,10,10);
     }
-    // player
     var px=player.x*TILE+TILE/2, py=player.y*TILE+TILE/2;
     ctx.fillStyle="#39c2ff";
     ctx.beginPath(); ctx.arc(px,py,TILE*0.32,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle="#1c86b8"; ctx.lineWidth=2; ctx.stroke();
+    if(spottedAt){
+      var sx=spottedAt.x*TILE+TILE/2, sy=spottedAt.y*TILE+TILE/2;
+      ctx.strokeStyle="#ff2d2d"; ctx.lineWidth=5;
+      ctx.beginPath();
+      ctx.moveTo(sx-14,sy-14); ctx.lineTo(sx+14,sy+14);
+      ctx.moveTo(sx+14,sy-14); ctx.lineTo(sx-14,sy+14);
+      ctx.stroke();
+    }
   }
   function drawCone(g){
     var f=guardFacing(g);
@@ -246,7 +321,6 @@ if(player.x===18&&player.y===2){win();return;}
         }
       }
     }
-    // brighter rim: cone tiles whose 8-neighbourhood touches a non-cone tile
     for(var r2=0;r2<ROWS;r2++){
       for(var c2=0;c2<COLS;c2++){
         if(!inCone(g,c2,r2))continue;
@@ -267,15 +341,20 @@ if(player.x===18&&player.y===2){win();return;}
   }
   function refresh(){updateCounters();draw();}
 
-  // input
   var keyMap={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]};
   window.addEventListener("keydown",function(e){
     var k=e.key;
-    if(k===' '){restart();return;}
+    if(k===' '){
+      if(levelClear){advanceToLevel2();return;}
+      restart();return;
+    }
     var m=keyMap[k];
     if(m){e.preventDefault();movePlayer(m[0],m[1]);}
   });
   document.getElementById("restart").addEventListener("click",restart);
+  document.getElementById("band").addEventListener("click",function(){
+    if(levelClear)advanceToLevel2();
+  });
 
   function playSeq(seq){
     for(var i=0;i<seq.length;i++){
@@ -291,7 +370,7 @@ if(player.x===18&&player.y===2){win();return;}
     var dirs=[[1,0],[-1,0],[0,1],[0,-1]];
     while(q.length){
       var cur=q.shift();
-      if(cur.x===18&&cur.y===2)return cur.path;
+      if(cur.x===EXIT.x&&cur.y===EXIT.y)return cur.path;
       for(var i=0;i<dirs.length;i++){
         var nx=cur.x+dirs[i][0], ny=cur.y+dirs[i][1];
         if(solid(nx,ny))continue;
@@ -304,21 +383,23 @@ if(player.x===18&&player.y===2){win();return;}
     return [];
   }
 
-  // shots
   var params=new URLSearchParams(location.search);
   var shot=params.get("shot");
-  initGuards();
+  loadLevel(0);
   if(shot==="play"){
     playSeq(["ArrowRight","ArrowLeft","ArrowRight","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowRight"]);
   } else if(shot==="spotted"){
     playSeq(["ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowUp","ArrowRight","ArrowRight","ArrowRight"]);
   } else if(shot==="end"){
+    shotMode=true;
     noSpot=true;
     var seq=buildPathToExit();
     for(var i=0;i<seq.length;i++){movePlayer(seq[i][0],seq[i][1]);}
-    if(!won){ /* force win if somehow not reached */ }
+    var seq2=buildPathToExit();
+    for(var j=0;j<seq2.length;j++){movePlayer(seq2[j][0],seq2[j][1]);}
   }
   refresh();
+  window.__test={get player(){return player;},get grid(){return grid;},get EXIT(){return EXIT;},get START(){return START;},get COLS(){return COLS;},get ROWS(){return ROWS;},solid:solid};
 })();
 </script>
 </body>
