@@ -77,7 +77,7 @@
         "#P.....######...E..#",
         "####################"
       ],
-      start:{x:1,y:8}, exit:{x:18,y:8}, coneRange:3,
+      start:{x:1,y:8}, exit:{x:16,y:8}, coneRange:3,
       guards:[
         {wp:[[1,1],[6,1],[6,3],[1,3]],start:[1,1]},
         {wp:[[13,1],[18,1],[18,3],[13,3]],start:[13,1]},
@@ -348,6 +348,7 @@
       if(levelClear){advanceToLevel2();return;}
       restart();return;
     }
+    if(k==='r'||k==='R'){restart();return;}
     var m=keyMap[k];
     if(m){e.preventDefault();movePlayer(m[0],m[1]);}
   });
